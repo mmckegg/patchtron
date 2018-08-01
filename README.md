@@ -1,4 +1,4 @@
-# PATCHTRON 3000™️
+# PATCHTRON 3000™
 
 Yet another SSB client! Probably gonna be Patchwork 4.0, but for now is missing a lot of things and under pretty serious development
 
