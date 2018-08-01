@@ -1,0 +1,44 @@
+{
+  "name": "patchtron",
+  "version": "4.0.0-pre1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron run.js --friends.hops 2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mmckegg/patchtron.git"
+  },
+  "author": "",
+  "license": "AGPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/mmckegg/patchtron/issues"
+  },
+  "homepage": "https://github.com/mmckegg/patchtron#readme",
+  "dependencies": {
+    "color-hash": "^1.0.3",
+    "electron": "^2.0.5",
+    "electron-builder": "^20.22.0",
+    "electron-default-menu": "^1.0.1",
+    "electron-window-state": "^4.1.1",
+    "emoji-named-characters": "^1.0.2",
+    "geval": "^2.2.0",
+    "hashlru": "^2.2.1",
+    "html-escape": "^2.0.0",
+    "human-time": "0.0.1",
+    "micro-css": "^2.0.1",
+    "mutant": "^3.22.1",
+    "pull-defer": "^0.2.2",
+    "pull-next": "^1.0.1",
+    "pull-pause": "0.0.2",
+    "scuttle-shell": "github:ssbc/scuttle-shell#enhancement-custom-plugins",
+    "ssb-client": "^4.5.7",
+    "ssb-config": "^2.2.0",
+    "ssb-markdown": "^3.6.0",
+    "ssb-ref": "^2.11.1",
+    "suggest-box": "^2.2.3",
+    "xtend": "^4.0.1"
+  }
+}
