@@ -22,10 +22,6 @@ document.head.appendChild(h('style', {
   innerHTML: require('./styles')
 }))
 
-window.addEventListener('popstate', (ev) => {
-  console.log(ev)
-})
-
 catchLinks(document, (href, external) => {
   if (!external) {
     navigate(href)

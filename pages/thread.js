@@ -38,9 +38,6 @@ module.exports = function renderThread (id, {connection, i18n}) {
 
   pull(
     pullThread({dest: id}),
-    pull.through(msg => console.log(msg)),
-    // GroupWhile((result, msg) => result.length < 20),
-    // pull.flatten(),
     scroller
   )
 
