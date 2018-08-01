@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron run.js --friends.hops 2"
+    "start": "electron run.js --friends.hops 2",
+    "rebuild": "cross-script npm rebuild --runtime=electron \"--target=$(electron -v)\" \"--abi=$(electron --abi)\" --disturl=https://atom.io/download/atom-shell"
   },
   "repository": {
     "type": "git",
@@ -19,6 +20,7 @@
   "homepage": "https://github.com/mmckegg/patchtron#readme",
   "dependencies": {
     "color-hash": "^1.0.3",
+    "cross-script": "^1.0.5",
     "electron": "^2.0.5",
     "electron-builder": "^20.22.0",
     "electron-default-menu": "^1.0.1",
