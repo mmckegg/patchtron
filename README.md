@@ -15,3 +15,7 @@ npm install
 # this does use scuttle-shell, but make sure you don't have any other clients open (as it uses custom plugins)
 npm start
 ```
+
+## License
+
+[GNU Affero General Public License v3.0](/LICENSE)
