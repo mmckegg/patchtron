@@ -5,6 +5,7 @@ const pullChunk = require('../lib/pull-chunk')
 
 module.exports = function renderFeed (getStream, {connection, i18n, prepend, renderItem}) {
   var done = Value(false)
+  var error = Value(null)
   var loading = Proxy(true)
 
   var content = h('section.content')
@@ -13,13 +14,17 @@ module.exports = function renderFeed (getStream, {connection, i18n, prepend, ren
   }, [
     h('div.wrapper', [
       h('section.prepend', prepend),
+      when(error, computed(error, renderError)),
       content,
       when(loading, h('Loading -large'))
     ])
   ])
 
   var scroller = Scroller(container, content, (msg) => renderItem(msg, {connection, i18n}), {
-    onDone: () => done.set(true),
+    onDone: (err) => {
+      if (err) error.set(err)
+      done.set(true)
+    },
     onItemVisible: (item) => {}
   })
 
@@ -38,4 +43,13 @@ module.exports = function renderFeed (getStream, {connection, i18n, prepend, ren
   container.done = done
 
   return container
+}
+
+function renderError (err) {
+  if (err) {
+    return h('ErrorMessage', [
+      h('h1', '⚠️ An error occurred'),
+      h('pre', err.stack)
+    ])
+  }
 }
