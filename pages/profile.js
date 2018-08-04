@@ -3,6 +3,7 @@ const extend = require('xtend')
 const {h} = require('mutant')
 const image = require('../views/image')
 const person = require('../views/person')
+const renderItem = require('../views/feed-item')
 
 module.exports = function ProfilePage (id, {i18n, connection, navigate}) {
   var prepend = h('header', {className: 'ProfileHeader'}, [
@@ -25,5 +26,5 @@ module.exports = function ProfilePage (id, {i18n, connection, navigate}) {
       id,
       filterReplyAuthors: [id]
     }))
-  }), {connection, i18n, prepend})
+  }), {connection, i18n, prepend, renderItem})
 }

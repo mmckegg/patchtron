@@ -1,10 +1,9 @@
 const { h, Value, when, Proxy, computed } = require('mutant')
 const Scroller = require('../lib/scroller')
-const renderItem = require('./feed-item')
 const pull = require('pull-stream')
 const pullChunk = require('../lib/pull-chunk')
 
-module.exports = function renderFeed (getStream, {connection, i18n, prepend}) {
+module.exports = function renderFeed (getStream, {connection, i18n, prepend, renderItem}) {
   var done = Value(false)
   var loading = Proxy(true)
 
