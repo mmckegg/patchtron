@@ -60,7 +60,7 @@ var mainView = h(`MainWindow -${process.platform}`, {
       // ])
     ]),
     h('span.appTitle', [
-      h('span.title', i18n('PatchTron 3000™️')),
+      h('span.title', i18n('PATCHTRON 3000™️')),
       // api.app.html.progressNotifier()
     ]),
     h('span', [

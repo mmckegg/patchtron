@@ -1,11 +1,22 @@
 {
-  "name": "patchtron",
+  "name": "Patchtron",
   "version": "4.0.0-pre1",
   "description": "",
-  "main": "index.js",
+  "main": "run.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron run.js --friends.hops 2"
+    "start": "electron run.js --friends.hops 2",
+    "pack": "build --dir",
+    "pack:all": "build --dir -mlw",
+    "pack:mac": "build --dir -m",
+    "pack:linux": "build --dir -l",
+    "pack:windows": "build --dir -w",
+    "release": "build",
+    "release:all": "build -mlw",
+    "release:mac": "build -m",
+    "release:linux": "build -l",
+    "release:windows": "build -w",
+    "publish": "build -mlw --publish=always"
   },
   "repository": {
     "type": "git",
@@ -19,8 +30,6 @@
   "homepage": "https://github.com/mmckegg/patchtron#readme",
   "dependencies": {
     "color-hash": "^1.0.3",
-    "electron": "^2.0.5",
-    "electron-builder": "^20.22.0",
     "electron-default-menu": "^1.0.1",
     "electron-window-state": "^4.1.1",
     "emoji-named-characters": "^1.0.2",
@@ -40,5 +49,60 @@
     "ssb-ref": "^2.11.1",
     "suggest-box": "^2.2.3",
     "xtend": "^4.0.1"
+  },
+  "devDependencies": {
+    "electron": "^2.0.5",
+    "electron-builder": "^20.22.0"
+  },
+  "build": {
+    "appId": "org.ssbc.PATCHTRON",
+    "asarUnpack": [
+      "node_modules/sodium-native/prebuilds"
+    ],
+    "npmSkipBuildFromSource": true,
+    "npmArgs": [
+      "--abi=57"
+    ],
+    "files": [
+      "**/*",
+      "!node_modules/**/deps${/*}",
+      "!node_modules/**/_node_modules${/*}",
+      "!node_modules/sodium-native/prebuilds${/*}",
+      "node_modules/sodium-native/prebuilds/${os}-${arch}/electron-57.node",
+      "node_modules/sodium-native/prebuilds/${os}-${arch}/libsodium.*"
+    ],
+    "mac": {
+      "icon": "build/icon.icns",
+      "target": "dmg",
+      "publish": [
+        "github"
+      ],
+      "files": [
+        "node_modules/sodium-native/prebuilds/darwin-${arch}/electron-57.node",
+        "node_modules/sodium-native/prebuilds/darwin-${arch}/libsodium.*"
+      ]
+    },
+    "linux": {
+      "category": "Network"
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "publisherName": "Secure Scuttlebutt Consortium",
+      "files": [
+        "node_modules/sodium-native/prebuilds/win32-${arch}/electron-57.node",
+        "node_modules/sodium-native/prebuilds/win32-${arch}/libsodium.*"
+      ]
+    },
+    "dmg": {
+      "icon": "build/dmg-icon.icns",
+      "artifactName": "PATCHTRON-${version}-mac.${ext}"
+    },
+    "appImage": {
+      "artifactName": "PATCHTRON-${version}-linux-${arch}.${ext}"
+    },
+    "nsis": {
+      "installerIcon": "build/setup-icon.ico",
+      "artifactName": "PATCHTRON-${version}-windows.${ext}"
+    }
   }
 }
