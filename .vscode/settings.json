@@ -4,6 +4,7 @@
         "flumeview",
         "hashlru",
         "hlru",
-        "patchtron"
+        "patchtron",
+        "resumable"
     ]
 }

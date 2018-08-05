@@ -1,11 +1,11 @@
 'use strict'
 var pull = require('pull-stream')
 var FlumeViewLevel = require('flumeview-level')
-var pullCat = require('pull-cat')
 var HLRU = require('hashlru')
 var extend = require('xtend')
 var normalizeChannel = require('ssb-ref').normalizeChannel
 var Defer = require('pull-defer')
+var pullResume = require('../lib/pull-resume')
 var getRoot = require('../lib/get-root')
 var getTimestamp = require('../lib/get-timestamp')
 var threadSummary = require('../lib/thread-summary')
@@ -25,90 +25,85 @@ module.exports = function (ssb, config) {
   var cache = HLRU(100)
 
   return {
-    read: function ({ids = [ssb.id], reverse, limit, lt, gt}) {
-      var opts = {reverse, old: true}
-
-      // handle markers passed in to lt / gt
-      if (lt && typeof lt.timestamp === 'number') lt = lt.timestamp
-      if (gt && typeof gt.timestamp === 'number') gt = gt.timestamp
-      if (typeof lt === 'number') opts.lt = [lt]
-      if (typeof gt === 'number') opts.gt = [gt]
-
+    read: function ({ids = [ssb.id], reverse, limit, resume}) {
       var seen = new Set()
       var included = new Set()
-      var marker = {marker: true, timestamp: null}
 
       var stream = Defer.source()
 
       getFilter((err, filter) => {
         if (err) return stream.abort(err)
 
-        stream.resolve(pull(
-          // READ ROOTS INDEX
-          index.read(opts),
+        // use resume option if specified
+        var opts = {reverse, old: true}
+        if (resume) {
+          opts[reverse ? 'lt' : 'gt'] = [resume]
+        }
 
-          // BUMP FILTER
-          pull.filter(item => {
-            // keep track of latest timestamp
-            marker.timestamp = item.key[0]
-
-            if (filter && item.value && item.value) {
-              var filterResult = filter(ids, item.value)
-              if (filterResult) {
-                item.value.filterResult = filterResult
-                return true
-              }
-            }
-          }),
-
-          // LOOKUP AND ADD ROOTS
-          LookupRoots(),
-
-          // FILTER ROOTS
-          pull.filter(item => {
-            var root = item.root || item
-            var isPrivate = root.value && root.value.private
-
-            // skip this item if it has already been included
-            if (!included.has(root.key) && filter && root && root.value && !isPrivate) {
-              if (checkReplyForcesDisplay(item)) { // include this item if it has matching tags or the author is you
-                // update filter result so that we can display the correct bump message
-                root.filterResult = extend(item.filterResult, {forced: true})
-                included.add(root.key)
-                return true
-              } else if (!seen.has(root.key)) {
-                seen.add(root.key)
-                var filterResult = filter(ids, root)
-                if (shouldShow(filterResult)) {
-                  root.filterResult = filterResult
-                  included.add(root.key)
+        stream.resolve(pullResume.source(index.read(opts), {
+          limit,
+          getResume: (item) => item && item.key && item.key[0],
+          filterMap: pull(
+            // BUMP FILTER
+            pull.filter(item => {
+              if (filter && item.value && item.value) {
+                var filterResult = filter(ids, item.value)
+                if (filterResult) {
+                  item.value.filterResult = filterResult
                   return true
                 }
               }
-            }
-          }),
-
-          // MAP ROOT ITEMS
-          pull.map(item => {
-            var root = item.root || item
-            return root
-          }),
-
-          // ADD THREAD SUMMARY
-          pull.asyncMap((item, cb) => {
-            threadSummary(item.key, {
-              recentLimit: 3,
-              readThread: ssb.patchtron.thread.read,
-              bumpFilter
-            }, (err, summary) => {
-              if (err) return cb(err)
-              cb(null, extend(item, summary, {
-                filterResult: undefined,
-                rootBump: bumpFromFilterResult(item, item.filterResult)
-              }))
+            }),
+  
+            // LOOKUP AND ADD ROOTS
+            LookupRoots(),
+  
+            // FILTER ROOTS
+            pull.filter(item => {
+              var root = item.root || item
+              var isPrivate = root.value && root.value.private
+  
+              // skip this item if it has already been included
+              if (!included.has(root.key) && filter && root && root.value && !isPrivate) {
+                if (checkReplyForcesDisplay(item)) { // include this item if it has matching tags or the author is you
+                  // update filter result so that we can display the correct bump message
+                  root.filterResult = extend(item.filterResult, {forced: true})
+                  included.add(root.key)
+                  return true
+                } else if (!seen.has(root.key)) {
+                  seen.add(root.key)
+                  var filterResult = filter(ids, root)
+                  if (shouldShow(filterResult)) {
+                    root.filterResult = filterResult
+                    included.add(root.key)
+                    return true
+                  }
+                }
+              }
+            }),
+  
+            // MAP ROOT ITEMS
+            pull.map(item => {
+              var root = item.root || item
+              return root
+            }),
+  
+            // ADD THREAD SUMMARY
+            pull.asyncMap((item, cb) => {
+              threadSummary(item.key, {
+                recentLimit: 3,
+                readThread: ssb.patchtron.thread.read,
+                bumpFilter
+              }, (err, summary) => {
+                if (err) return cb(err)
+                cb(null, extend(item, summary, {
+                  filterResult: undefined,
+                  rootBump: bumpFromFilterResult(item, item.filterResult)
+                }))
+              })
             })
-          })
-        ))
+          )
+        }))
 
         function bumpFilter (msg) {
           let filterResult = filter(ids, msg)
@@ -116,27 +111,7 @@ module.exports = function (ssb, config) {
         }
       })
 
-      // TRUNCATE
-      if (typeof limit === 'number') {
-        var count = 0
-        return pullCat([
-          pull(
-            stream,
-            pull.take(limit),
-            pull.through(() => {
-              count += 1
-            })
-          ),
-
-          // send truncated marker for resuming search
-          pull(
-            pull.values([marker]),
-            pull.filter(() => count === limit)
-          )
-        ])
-      } else {
-        return stream
-      }
+      return stream
     }
   }
 

@@ -19,7 +19,7 @@ module.exports = function (ssb, config) {
         var root = getRoot(msg)
         return root === dest && (!types || types.includes(type))
       }),
-      limit ? pull.limit(limit) : pull.through()
+      limit ? pull.take(limit) : pull.through()
     )
   }
 }

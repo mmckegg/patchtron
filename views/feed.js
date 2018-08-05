@@ -1,12 +1,12 @@
 const { h, Value, when, Proxy, computed } = require('mutant')
 const Scroller = require('../lib/scroller')
 const pull = require('pull-stream')
-const pullChunk = require('../lib/pull-chunk')
 
-module.exports = function renderFeed (getStream, {connection, i18n, prepend, renderItem}) {
+module.exports = function renderFeed ({connection, i18n, prepend, renderItem, getStream}) {
   var done = Value(false)
   var error = Value(null)
   var loading = Proxy(true)
+  var seen = new Set()
 
   var content = h('section.content')
   var container = h('Scroller', {
@@ -33,8 +33,17 @@ module.exports = function renderFeed (getStream, {connection, i18n, prepend, ren
   }))
 
   pull(
-    pullChunk(getStream, {reverse: true, limit: 200}),
-    pull.filter(msg => msg.value && msg.value.content.type === 'post'),
+    getStream(),
+    pull.filter(msg => {
+      // only render posts
+      if (!msg.value || msg.value.content.type !== 'post') return
+
+      // only render a post the first time we see it (duplicates because of resume)
+      if (!seen.has(msg.key)) {
+        seen.add(msg.key)
+        return true
+      }
+    }),
     // GroupWhile((result, msg) => result.length < 20),
     // pull.flatten(),
     scroller

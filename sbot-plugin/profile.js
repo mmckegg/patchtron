@@ -6,7 +6,7 @@ const UniqueRoots = require('../lib/unique-roots')
 const getRoot = require('../lib/get-root')
 const threadSummary = require('../lib/thread-summary')
 
-module.exports = function (ssb, config) {
+module.exports = function Profile (ssb, config) {
   var cache = HLRU(100)
 
   return {
