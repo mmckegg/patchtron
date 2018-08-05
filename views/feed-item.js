@@ -19,7 +19,7 @@ module.exports = function renderItem (msg, {connection, i18n}) {
   var meta = null
 
   // explain why this message is in your feed
-  if (msg.rootBump && msg.rootBump.type === 'matches-channel' && Array.isArray(msg.rootBump.channels)) {
+  if (mostRecentBumpType !== 'matches-channel' && msg.rootBump && msg.rootBump.type === 'matches-channel') {
     // the root post was in a channel that you subscribe to
     meta = h('div.meta', [
       many(msg.rootBump.channels, {renderItem: channel, i18n}), ' ', i18n('mentioned in your network')
