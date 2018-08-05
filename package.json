@@ -4,6 +4,8 @@
   "description": "",
   "main": "run.js",
   "scripts": {
+    "postinstall": "npm run rebuild",
+    "rebuild": "electron-builder install-app-deps",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron run.js --friends.hops 2",
     "pack": "build --dir",
