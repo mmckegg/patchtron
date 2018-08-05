@@ -16,8 +16,7 @@ exports.manifest = {
     roots: 'source'
   },
   thread: {
-    read: 'source',
-    summary: 'async'
+    read: 'source'
   },
   about: {
     read: 'source',

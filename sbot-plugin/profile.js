@@ -1,67 +1,64 @@
 const pull = require('pull-stream')
 const extend = require('xtend')
 const HLRU = require('hashlru')
-var getRoot = require('../lib/get-root')
+const LookupRoots = require('../lib/lookup-roots')
+const UniqueRoots = require('../lib/unique-roots')
+const getRoot = require('../lib/get-root')
+const threadSummary = require('../lib/thread-summary')
 
 module.exports = function (ssb, config) {
   var cache = HLRU(100)
 
   return {
     roots: function ({id, limit, old, live, filterReplyAuthors}) {
-      var included = new Set()
       return pull(
         ssb.createUserStream({id, reverse: true, limit, old, live}),
 
-        LookupRoots(),
+        LookupRoots({ssb, cache}),
 
         // DON'T REPEAT THE SAME THREAD
+        UniqueRoots(),
+
+        // DON'T INCLUDE UN-ROOTED MESSAGES (e.g. missing conversation root)
         pull.filter(msg => {
-          if (!included.has(msg.key) && !getRoot(msg)) {
-            included.add(msg.key)
-            return true
-          }
+          return !getRoot(msg.root)
+        }),
+
+        // JUST RETURN THE ROOT OF THE MESSAGE
+        pull.map(msg => {
+          return msg.root || msg
         }),
 
         // ADD THREAD SUMMARY
         pull.asyncMap((item, cb) => {
-          ssb.patchtron.thread.summary({
-            dest: item.key,
-            limit: 3,
-            filterAuthors: filterReplyAuthors
+          threadSummary(item.key, {
+            readThread: ssb.patchtron.thread.read,
+            recentLimit: 3,
+            bumpFilter
           }, (err, summary) => {
             if (err) return cb(err)
             cb(null, extend(item, summary))
           })
         })
       )
-    }
-  }
 
-  function LookupRoots () {
-    return pull.asyncMap((msg, cb) => {
-      let rootKey = getRoot(msg)
-      if (!rootKey) {
-        // already a root
-        return cb(null, msg)
-      }
-      getThruCache(rootKey, (_, value) => {
-        cb(null, value)
-      })
-    })
-  }
-
-  function getThruCache (key, cb) {
-    if (cache.has(key)) {
-      cb(null, cache.get(key))
-    } else {
-      // don't do an ooo lookup
-      ssb.get({id: key, raw: true}, (_, value) => {
-        var msg = {key, value}
-        if (msg.value) {
-          cache.set(key, msg)
+      function bumpFilter (msg) {
+        // match summary bumps to actual bumps
+        if (msg.value.author === ssb.id) {
+          let content = msg.value.content
+          let type = content.type
+          if (type === 'vote') {
+            let vote = content.vote
+            if (vote) {
+              return {type: 'reaction', reaction: vote.expression, value: vote.value}
+            }
+          } else if (type === 'post') {
+            return {type: 'reply'}
+          } else if (type === 'about') {
+            return {type: 'update'}
+          }
         }
-        cb(null, msg)
-      })
+      }
     }
   }
 }

@@ -8,10 +8,9 @@ var normalizeChannel = require('ssb-ref').normalizeChannel
 var Defer = require('pull-defer')
 var getRoot = require('../lib/get-root')
 var getTimestamp = require('../lib/get-timestamp')
-var Thread = require('./thread')
+var threadSummary = require('../lib/thread-summary')
 
 module.exports = function (ssb, config) {
-  var thread = Thread(ssb, config)
   var create = FlumeViewLevel(0, function (msg, seq) {
     var result = [
       [getTimestamp(msg), getRoot(msg) || msg.key]
@@ -137,7 +136,11 @@ module.exports = function (ssb, config) {
 
           // ADD THREAD SUMMARY
           pull.asyncMap((item, cb) => {
-            thread.summary({dest: item.key, limit: 3}, (err, summary) => {
+            threadSummary(item.key, {
+              recentLimit: 3,
+              readThread: ssb.patchtron.thread.read,
+              bumpFilter
+            }, (err, summary) => {
               if (err) return cb(err)
               cb(null, extend(item, summary))
             })
@@ -165,6 +168,12 @@ module.exports = function (ssb, config) {
         ])
       } else {
         return stream
+      }
+
+      function bumpFilter (msg) {
+        if (msg.value.content.type === 'post') {
+          return {type: 'reply'}
+        }
       }
     }
   }

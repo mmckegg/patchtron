@@ -2,7 +2,7 @@ FeedEvent {
   display: flex
   flex-direction: column
   background: white
-  border: #DDD solid 1px
+  border: #EEE solid 1px
   width: 100%
   margin: 25px auto
 
@@ -76,6 +76,13 @@ FeedEvent {
     font-size: 100%
     padding: 10px 20px
     opacity: 0.8
+
+    a {
+      [href^="@"] {
+        font-weight: bold
+        color: black
+      }  
+    }
   }
 
 }
