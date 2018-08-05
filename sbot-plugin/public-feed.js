@@ -1,68 +1,62 @@
 'use strict'
-var pull = require('pull-stream')
-var FlumeViewLevel = require('flumeview-level')
-var HLRU = require('hashlru')
-var extend = require('xtend')
-var normalizeChannel = require('ssb-ref').normalizeChannel
-var Defer = require('pull-defer')
-var pullResume = require('../lib/pull-resume')
-var getRoot = require('../lib/get-root')
-var getTimestamp = require('../lib/get-timestamp')
-var threadSummary = require('../lib/thread-summary')
+const pull = require('pull-stream')
+const HLRU = require('hashlru')
+const extend = require('xtend')
+const normalizeChannel = require('ssb-ref').normalizeChannel
+const Defer = require('pull-defer')
+const pullResume = require('../lib/pull-resume')
+const threadSummary = require('../lib/thread-summary')
+const LookupRoots = require('../lib/lookup-roots')
 
-module.exports = function (ssb, config) {
-  var create = FlumeViewLevel(0, function (msg, seq) {
-    var result = [
-      [getTimestamp(msg), getRoot(msg) || msg.key]
-    ]
-    return result
-  })
-
-  var index = ssb._flumeUse('patchtron-roots', create)
-
+module.exports = function PublicFeed (ssb, config) {
   // cache mostly just to avoid reading the same roots over and over again
   // not really big enough for multiple refresh cycles
   var cache = HLRU(100)
 
   return {
-    read: function ({ids = [ssb.id], reverse, limit, resume}) {
+    roots: function ({ids = [ssb.id], reverse, limit, resume}) {
       var seen = new Set()
       var included = new Set()
 
       var stream = Defer.source()
 
-      getFilter((err, filter) => {
+      getFilter({ssb, ids}, (err, filter) => {
         if (err) return stream.abort(err)
 
         // use resume option if specified
         var opts = {reverse, old: true}
         if (resume) {
-          opts[reverse ? 'lt' : 'gt'] = [resume]
+          opts[reverse ? 'lt' : 'gt'] = resume
         }
 
-        stream.resolve(pullResume.source(index.read(opts), {
+        stream.resolve(pullResume.source(ssb.createFeedStream(opts), {
           limit,
-          getResume: (item) => item && item.key && item.key[0],
+          getResume: (item) => {
+            // WAITING FOR: https://github.com/ssbc/secure-scuttlebutt/pull/215
+            // otherwise roots can potentially have unwanted items pinned to top of feed
+            // if a message has a timestamp far in the future
+            return item && (item.rts || (item.value && item.value.timestamp))
+          },
           filterMap: pull(
             // BUMP FILTER
             pull.filter(item => {
-              if (filter && item.value && item.value) {
-                var filterResult = filter(ids, item.value)
+              if (filter && item) {
+                var filterResult = filter(item)
                 if (filterResult) {
-                  item.value.filterResult = filterResult
+                  item.filterResult = filterResult
                   return true
                 }
               }
             }),
-  
+
             // LOOKUP AND ADD ROOTS
-            LookupRoots(),
-  
+            LookupRoots({ssb, cache}),
+
             // FILTER ROOTS
             pull.filter(item => {
               var root = item.root || item
               var isPrivate = root.value && root.value.private
-  
+
               // skip this item if it has already been included
               if (!included.has(root.key) && filter && root && root.value && !isPrivate) {
                 if (checkReplyForcesDisplay(item)) { // include this item if it has matching tags or the author is you
@@ -72,7 +66,7 @@ module.exports = function (ssb, config) {
                   return true
                 } else if (!seen.has(root.key)) {
                   seen.add(root.key)
-                  var filterResult = filter(ids, root)
+                  var filterResult = filter(root)
                   if (shouldShow(filterResult)) {
                     root.filterResult = filterResult
                     included.add(root.key)
@@ -81,13 +75,13 @@ module.exports = function (ssb, config) {
                 }
               }
             }),
-  
+
             // MAP ROOT ITEMS
             pull.map(item => {
               var root = item.root || item
               return root
             }),
-  
+
             // ADD THREAD SUMMARY
             pull.asyncMap((item, cb) => {
               threadSummary(item.key, {
@@ -106,7 +100,7 @@ module.exports = function (ssb, config) {
         }))
 
         function bumpFilter (msg) {
-          let filterResult = filter(ids, msg)
+          let filterResult = filter(msg)
           return bumpFromFilterResult(msg, filterResult)
         }
       })
@@ -118,71 +112,13 @@ module.exports = function (ssb, config) {
   function shouldShow (filterResult) {
     return !!filterResult
   }
-
-  function getThruCache (key, cb) {
-    if (cache.has(key)) {
-      cb(null, cache.get(key))
-    } else {
-      // don't do an ooo lookup
-      ssb.get({id: key, raw: true}, (_, value) => {
-        var msg = {key, value}
-        if (msg.value) {
-          cache.set(key, msg)
-        }
-        cb(null, msg)
-      })
-    }
-  }
-
-  function getFilter (cb) {
-    // TODO: rewrite contacts stream
-    ssb.friends.get((err, friends) => {
-      if (err) return cb(err)
-      ssb['patchtron'].getSubscriptions((err, subscriptions) => {
-        if (err) return cb(err)
-        cb(null, function (ids, msg) {
-          var type = msg.value.content.type
-          if (type === 'vote') return false // filter out likes
-          var hasChannel = !!msg.value.content.channel
-          var matchesChannel = (type !== 'channel' && checkChannel(subscriptions, ids, msg.value.content.channel))
-          var matchingTags = getMatchingTags(subscriptions, ids, msg.value.content.mentions)
-          var isYours = ids.includes(msg.value.author)
-          var mentionsYou = getMentionsYou(ids, msg.value.content.mentions)
-
-          var following = checkFollowing(friends, ids, msg.value.author)
-          if (isYours || matchesChannel || matchingTags.length || following || mentionsYou) {
-            return {
-              matchingTags, matchesChannel, isYours, following, mentionsYou, hasChannel
-            }
-          }
-        })
-      })
-    })
-  }
-
-  function LookupRoots () {
-    return pull.asyncMap((item, cb) => {
-      var msg = item.value
-      var key = item.key[1]
-
-      if (key === msg.key) {
-        // already a root
-        return cb(null, msg)
-      }
-      getThruCache(key, (_, value) => {
-        cb(null, extend(msg, {
-          root: value
-        }))
-      })
-    })
-  }
 }
 
-function getMatchingTags (lookup, ids, mentions) {
+function getMatchingTags (lookup, mentions) {
   if (Array.isArray(mentions)) {
     return mentions.reduce((result, mention) => {
       if (mention && typeof mention.link === 'string' && mention.link.startsWith('#')) {
-        if (checkChannel(lookup, ids, mention.link.slice(1))) {
+        if (checkChannel(lookup, mention.link.slice(1))) {
           result.push(normalizeChannel(mention.link.slice(1)))
         }
       }
@@ -217,12 +153,11 @@ function checkFollowing (lookup, ids, target) {
   return value && value[0]
 }
 
-function checkChannel (lookup, ids, channel) {
+function checkChannel (lookup, channel) {
   if (!lookup) return false
   channel = normalizeChannel(channel)
   if (channel) {
-    var value = mostRecentValue(ids.map(id => lookup[`${id}:${channel}`]))
-    return value && value[1]
+    return lookup[channel] && lookup[channel].subscribed
   }
 }
 
@@ -247,4 +182,32 @@ function bumpFromFilterResult (msg, filterResult) {
       return {type: 'matches-channel', channels: Array.from(channels)}
     }
   }
+}
+
+function getFilter ({ids, ssb}, cb) {
+  // TODO: rewrite contacts stream
+  ssb.friends.get((err, friends) => {
+    if (err) return cb(err)
+
+    // TODO: support sameAs multiple IDs
+    ssb.patchtron.subscriptions.get({id: ids[0]}, (err, subscriptions) => {
+      if (err) return cb(err)
+      cb(null, function (msg) {
+        var type = msg.value.content.type
+        if (type === 'vote') return false // filter out likes
+        var hasChannel = !!msg.value.content.channel
+        var matchesChannel = (type !== 'channel' && checkChannel(subscriptions, msg.value.content.channel))
+        var matchingTags = getMatchingTags(subscriptions, msg.value.content.mentions)
+        var isYours = ids.includes(msg.value.author)
+        var mentionsYou = getMentionsYou(ids, msg.value.content.mentions)
+
+        var following = checkFollowing(friends, ids, msg.value.author)
+        if (isYours || matchesChannel || matchingTags.length || following || mentionsYou) {
+          return {
+            matchingTags, matchesChannel, isYours, following, mentionsYou, hasChannel
+          }
+        }
+      })
+    })
+  })
 }

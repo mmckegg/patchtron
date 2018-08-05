@@ -1,18 +1,19 @@
 
-var Roots = require('./roots')
 var Thread = require('./thread')
 var About = require('./about')
 var Likes = require('./likes')
 var Profile = require('./profile')
-
+var PublicFeed = require('./public-feed')
 var pull = require('pull-stream')
 var Subscriptions = require('./subscriptions')
 
 exports.name = 'patchtron'
 exports.version = require('../package.json').version
 exports.manifest = {
-  roots: 'source',
   profile: {
+    roots: 'source'
+  },
+  publicFeed: {
     roots: 'source'
   },
   thread: {
@@ -28,16 +29,18 @@ exports.manifest = {
     current: 'async',
     counts: 'async'
   },
-  getSubscriptions: 'async'
+  subscriptions: {
+    get: 'async'
+  }
 }
 
 exports.init = function (ssb, config) {
-  var roots = Roots(ssb, config)
   var thread = Thread(ssb, config)
   var subscriptions = Subscriptions(ssb, config)
   var about = About(ssb, config)
   var likes = Likes(ssb, config)
   var profile = Profile(ssb, config)
+  var publicFeed = PublicFeed(ssb, config)
 
   // prioritize pubs that we actually follow
   pull(
@@ -54,11 +57,11 @@ exports.init = function (ssb, config) {
   )
 
   return {
-    roots: roots.read,
+    publicFeed,
     thread,
     about,
     likes,
     profile,
-    getSubscriptions: subscriptions.get
+    subscriptions
   }
 }
