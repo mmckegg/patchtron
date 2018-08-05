@@ -57,7 +57,7 @@
     "electron-builder": "^20.22.0"
   },
   "build": {
-    "appId": "org.ssbc.PATCHTRON",
+    "appId": "org.ssbc.patchtron",
     "asarUnpack": [
       "node_modules/sodium-native/prebuilds"
     ],
