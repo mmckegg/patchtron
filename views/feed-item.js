@@ -16,8 +16,6 @@ module.exports = function renderItem (msg, {connection, i18n}) {
   let mostRecentBumpType = (msg.bumps && msg.bumps[0] && msg.bumps[0].type) || 'reply'
   let bumps = getBumps(msg)[mostRecentBumpType]
 
-  console.log('bumps', mostRecentBumpType, bumps)
-
   var meta = null
 
   if (bumps && bumps.length) {
