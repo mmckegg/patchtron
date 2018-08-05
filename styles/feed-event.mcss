@@ -78,10 +78,11 @@ FeedEvent {
     opacity: 0.8
 
     a {
-      [href^="@"] {
-        font-weight: bold
-        color: black
-      }  
+      font-weight: bold
+      color: black
+      [href^="#"] {
+        border-bottom: 1px dotted black
+      }
     }
   }
 

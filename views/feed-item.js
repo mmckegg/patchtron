@@ -18,14 +18,34 @@ module.exports = function renderItem (msg, {connection, i18n}) {
 
   var meta = null
 
-  if (bumps && bumps.length) {
-    var description = i18n(bumpMessages[mostRecentBumpType] || 'added changes')
+  // explain why this message is in your feed
+  if (msg.rootBump && msg.rootBump.type === 'matches-channel' && Array.isArray(msg.rootBump.channels)) {
+    // the root post was in a channel that you subscribe to
     meta = h('div.meta', [
-      many(getAuthors(bumps), {
-        i18n,
-        renderItem: author => person(author, {connection})
-      }), ' ', description
+      many(msg.rootBump.channels, {renderItem: channel, i18n}), ' ', i18n('mentioned in your network')
     ])
+  } else if (bumps && bumps.length) {
+    let authors = getAuthors(bumps)
+    if (mostRecentBumpType === 'matches-channel') {
+      // a reply to this post matches a channel you subscribe to
+      let channels = new Set()
+      bumps.forEach(bump => bump.channels && bump.channels.forEach(c => channels.add(c)))
+      meta = h('div.meta', [
+        i18n.plural('%s people from your network replied to this message on ', authors.length),
+        many(channels, {
+          i18n, renderItem: channel
+        })
+      ])
+    } else {
+      // someone you follow replied to this message
+      var description = i18n(bumpMessages[mostRecentBumpType] || 'added changes')
+      meta = h('div.meta', [
+        many(authors, {
+          i18n,
+          renderItem: author => person(author, {connection})
+        }), ' ', description
+      ])
+    }
   }
 
   return h('FeedEvent -post', [
@@ -56,4 +76,8 @@ function getAuthors (items) {
     authors[item.author] = true
   })
   return Object.keys(authors)
+}
+
+function channel (id) {
+  return h('a.channel', {href: `#${id}`}, `#${id}`)
 }

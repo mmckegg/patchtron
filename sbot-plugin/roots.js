@@ -25,45 +25,6 @@ module.exports = function (ssb, config) {
   var cache = HLRU(100)
 
   return {
-    latest: function ({ids = [ssb.id]}) {
-      var stream = Defer.source()
-      getFilter((err, filter) => {
-        if (err) return stream.abort(err)
-        stream.resolve(pull(
-          index.read({old: false}),
-
-          // BUMP FILTER
-          pull.filter(item => {
-            if (filter && item.value && item.value) {
-              var filterResult = filter(ids, item.value)
-              if (filterResult) {
-                item.value.filterResult = filterResult
-                return true
-              }
-            }
-          }),
-
-          // LOOKUP AND ADD ROOTS
-          LookupRoots(),
-
-          // FILTER ROOTS
-          pull.filter(item => {
-            var root = item.root || item
-            var isPrivate = root.value && root.value.private
-
-            if (filter && root && root.value && !isPrivate) {
-              var filterResult = filter(ids, root)
-              if (checkReplyForcesDisplay(item) || shouldShow(filterResult)) {
-                root.filterResult = filterResult
-                return true
-              }
-            }
-          })
-        ))
-      })
-      return stream
-    },
-
     read: function ({ids = [ssb.id], reverse, limit, lt, gt}) {
       var opts = {reverse, old: true}
 
@@ -78,7 +39,6 @@ module.exports = function (ssb, config) {
       var marker = {marker: true, timestamp: null}
 
       var stream = Defer.source()
-
 
       getFilter((err, filter) => {
         if (err) return stream.abort(err)
@@ -142,10 +102,18 @@ module.exports = function (ssb, config) {
               bumpFilter
             }, (err, summary) => {
               if (err) return cb(err)
-              cb(null, extend(item, summary))
+              cb(null, extend(item, summary, {
+                filterResult: undefined,
+                rootBump: bumpFromFilterResult(item, item.filterResult)
+              }))
             })
           })
         ))
+
+        function bumpFilter (msg) {
+          let filterResult = filter(ids, msg)
+          return bumpFromFilterResult(msg, filterResult)
+        }
       })
 
       // TRUNCATE
@@ -168,12 +136,6 @@ module.exports = function (ssb, config) {
         ])
       } else {
         return stream
-      }
-
-      function bumpFilter (msg) {
-        if (msg.value.content.type === 'post') {
-          return {type: 'reply'}
-        }
       }
     }
   }
@@ -297,4 +259,17 @@ function mostRecentValue (values, timestampIndex = 0) {
     }
   })
   return mostRecent
+}
+
+function bumpFromFilterResult (msg, filterResult) {
+  if (filterResult) {
+    if (filterResult.following) {
+      return {type: 'reply'}
+    } else if (filterResult.matchesChannel || filterResult.matchingTags.length) {
+      var channels = new Set()
+      if (filterResult.matchesChannel) channels.add(msg.value.content.channel)
+      if (Array.isArray(filterResult.matchingTags)) filterResult.matchingTags.forEach(x => channels.add(x))
+      return {type: 'matches-channel', channels: Array.from(channels)}
+    }
+  }
 }

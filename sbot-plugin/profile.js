@@ -34,13 +34,20 @@ module.exports = function (ssb, config) {
           threadSummary(item.key, {
             readThread: ssb.patchtron.thread.read,
             recentLimit: 3,
-            bumpFilter
+            bumpFilter,
+            recentFilter
           }, (err, summary) => {
             if (err) return cb(err)
             cb(null, extend(item, summary))
           })
         })
       )
+
+      function recentFilter (msg) {
+        let content = msg.value.content
+        let type = content.type
+        return type !== 'vote'
+      }
 
       function bumpFilter (msg) {
         // match summary bumps to actual bumps

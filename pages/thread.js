@@ -37,7 +37,7 @@ module.exports = function renderThread (id, {connection, i18n}) {
   })
 
   pull(
-    pullThread({dest: id}),
+    pullThread({dest: id, types: ['post', 'about']}),
     scroller
   )
 
