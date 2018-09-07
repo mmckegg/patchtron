@@ -21,11 +21,11 @@ module.exports = function ProfilePage (id, {i18n, connection, navigate}) {
     ])
   ])
 
-  var getStream = connection.pull((sbot, opts) => {
+  let getStream = connection.pullResume((sbot, opts) => {
     return sbot.patchtron.profile.roots(extend(opts, {
       id, filterReplyAuthors: [id]
     }))
-  })
+  }, {limit: 20, reverse: true})
 
   return renderFeed({connection, i18n, prepend, renderItem, getStream})
 }
